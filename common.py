@@ -1,16 +1,53 @@
-import boto.ec2
-import boto.sqs
-import boto.s3
 import json
+import re
+import random
+
+import boto.sqs
+from boto.sqs.message import Message
+
+keyre = re.compile('^AWSAccessKeyId=(.*)$')
 
 def getKeys(file):
 	with open(file,'r') as inf:
 		hdr = inf.readline()
-		keys = inf.readline().split(',')
-	return {
-		'aws_access_key' : keys[1], 
-		'aws_secret_access_key' : keys[2]
-	}
+		
+		# JSON format
+		if hdr[0] == '{':
+			inf.seek(0)
+			return json.load(inf)
+		
+		# Root key format
+		if keyre.match(hdr):
+			out = dict()
+			while hdr:
+				parts = hdr.split('=')
+				out[parts[0]] = parts[1].strip()
+				hdr = inf.readline();
+			return {
+				'aws_access_key_id' : out['AWSAccessKeyId'], 
+				'aws_secret_access_key' : out['AWSSecretKey']
+			}
+		# Colon format
+		elif hdr[0] == '#':
+			while hdr[0] == '#':
+				hdr = inf.readline()
+			out = dict()
+			while hdr:
+				parts = hdr.split(':')
+				out[parts[0]] = parts[1].strip()
+				hdr = inf.readline();
+			return {
+				'aws_access_key_id' : out['accessKeyId'], 
+				'aws_secret_access_key' : out['secretKey']
+			}
+		
+		# IAM format
+		else:
+			keys = inf.readline().split(',')
+			return {
+				'aws_access_key_id' : keys[1].strip(), 
+				'aws_secret_access_key' : keys[2].strip()
+			}
 
 
 keys = getKeys('credentials.csv')
