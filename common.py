@@ -5,6 +5,10 @@ import random
 import boto.sqs
 from boto.sqs.message import Message
 
+class ImageSharerMessage(object):
+    def __init__(self, j):
+		self.__dict__ = json.loads(j)
+
 keyre = re.compile('^AWSAccessKeyId=(.*)$')
 
 def getKeys(file):
@@ -50,10 +54,10 @@ def getKeys(file):
 			}
 
 
-keys = getKeys('credentials.csv')
+keys = getKeys('/home/ubuntu/credentials/amazon_dev-01_key.csv')
 region = 'us-west-2'
-queue_name = None
-bucket_name = None
+queue_name = 'imagesharerresizequeue'
+bucket_name = 'imagesharerresizebucket'
 
 if not queue_name: raise Exception('You must set a queue name.')
 if not bucket_name: raise Exception('You must set a bucket name.')

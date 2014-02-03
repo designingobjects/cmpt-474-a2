@@ -3,6 +3,8 @@ import time
 import StringIO
 from PIL import Image
 from common import bucket, queue
+from common import ImageSharerMessage
+from boto.sqs.message import RawMessage
 
 # Create a thumbnail from an image.
 # @param image: PIL image to resize.
@@ -43,15 +45,41 @@ def read(name):
 def write(name, image, format):
 	key = bucket.new_key(name)
 	buf = StringIO.StringIO()
-	image.save(buf, format=format, quality=8)
+	image.save(buf, format=format, quality=75)
 	key.set_metadata('Content-Type', 'image/'+format.lower())
 	key.set_contents_from_string(buf.getvalue())
 	buf.close()
+	
+	
 
 try:
+	queue.set_message_class(RawMessage)
 	
 	# Loop forever.
 	while 1:
+		
+		# wait for max 5 second to get a message from the queue and 
+		# when message if retrieved, make in visible for 30s seconds
+		message = queue.read(0, 0)
+		if message is not None:
+			messageBody = message.get_body()
+
+			# in case the message causes errors, skip all step and delete the message that causes the error
+			try:		
+				imageSharerMessage = ImageSharerMessage(messageBody)
+				
+				for sizeName in imageSharerMessage.sizes:
+					imageToResize = read(imageSharerMessage.id+'-original')
+					imageResized = thumbnail(imageToResize, imageSharerMessage.sizes[sizeName]['width'], imageSharerMessage.sizes[sizeName]['height'])
+					
+					write(imageSharerMessage.id+'-'+sizeName, imageResized,  imageToResize.format)
+					queue.delete_message(message)
+					print 'Image ' + imageSharerMessage.id + ' successfully resized as ' + sizeName + '.'
+			except(ValueError):
+				print 'Message not valid: ' + messageBody
+				queue.delete_message(message)
+		else :
+			print 'No message/s in queue.'
 		
 		# Read a message from the queue containing the key of
 		# the image to be resized, use read() to read the image.
@@ -63,3 +91,6 @@ try:
 # instead of raising some nasty exception.
 except KeyboardInterrupt:
 	pass
+	
+
+	

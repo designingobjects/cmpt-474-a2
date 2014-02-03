@@ -1,8 +1,13 @@
 import string
+import json
 from PIL import Image
 from bottle import route, request, run
 from boto.s3.key import Key
+import boto.sqs
+from boto.sqs.message import RawMessage
+import time
 from common import bucket, queue
+import random
 
 # All the sizes our app supports
 sizes = { 
@@ -11,15 +16,28 @@ sizes = {
 	'large': { 'width': 600, 'height': 600 }
 }
 
+chars=string.ascii_uppercase + string.digits
+
 # Generate a unique id to be used in an S3 bucket.
+# based from http://stackoverflow.com/questions/2257441/python-random-string-generation-with-upper-case-letters-and-digits
 def generate_id():
-	raise Exception('Implement me!')
+	id = ''.join(random.choice(chars) for x in range(16)) +  str(int(time.time()))
+	# check if this id already exists
+	key = bucket.get_key(id+'-original')
+	if not key: 
+		return id
+	# since it exists, re-call this function to create a new id
+	return generate_id()
 
 
 # Write a message to SQS containing enough information to 
 # create all the necessary thumbnails from a worker.
 def notify_worker(id, sizes):
-	raise Exception('Implement me!')	
+	m = RawMessage()
+	msg = json.dumps({"id": id, "sizes": sizes})
+	print msg
+	m.set_body(msg)
+	queue.write(m)
 
 
 # Generate a URL for a resource in an S3 bucket
@@ -75,6 +93,7 @@ def upload():
 	notify_worker(id, sizes)
 
 	# Return the URLs to the images.
+	#return 'image uploaded'
 	return  { key: url(id+'-'+key) for key in ['original'] + sizes.keys() }
 
 
