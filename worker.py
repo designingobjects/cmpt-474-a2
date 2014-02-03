@@ -60,7 +60,7 @@ try:
 		
 		# wait for max 5 second to get a message from the queue and 
 		# when message if retrieved, make in visible for 30s seconds
-		message = queue.read(0, 0)
+		message = queue.read(30, 5)
 		if message is not None:
 			messageBody = message.get_body()
 
